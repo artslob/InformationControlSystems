@@ -64,11 +64,11 @@ term:
 
 
 LIST_SRC = \
-$(SRC_DIR)/lab3.c \
-$(SRC_DIR)/max.c \
-$(SRC_DIR)/led.c \
-$(SRC_DIR)/interrupt.c \
-$(SRC_DIR)/timer.c
+$(SRC_DIR)/lab3.c       \
+$(SRC_DIR)/serial.c     \
+$(SRC_DIR)/max.c        \
+$(SRC_DIR)/led.c        \
+$(SRC_DIR)/interrupt.c
 
 
 LIST_OBJ = $(LIST_SRC:.c=.rel)
