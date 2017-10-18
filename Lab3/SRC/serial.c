@@ -32,10 +32,7 @@ void SIO_ISR( void ) __interrupt ( 4 ) {
 			iw++;
 		}
 		else if (iw == 8) {
-			SBUF = 0xD;
-			iw++;
-		}
-		else if (iw == 9) {
+			WFIFO = 0;
 			SBUF = 0xA;
 			ready_to_write = 0;
 			iw = 0;
@@ -44,16 +41,18 @@ void SIO_ISR( void ) __interrupt ( 4 ) {
 	}
 	if(RI) { // Прием байта
 		buf = SBUF;
+		leds(buf);
+		UART_SER_write(buf);
 		RI = 0;
-		if ((0x30 <= buf && buf <= 0x39) || buf == 0xD || buf == 0xA) {
+		if ((0x30 <= buf && buf <= 0x39) || buf == 0xD) {
 			RFIFO[ir++] = buf;
-			if (ir == 5 && (RFIFO[ir - 2] != 0xD || RFIFO[ir - 1] != 0xA)) {
+			if (ir == 4 && (RFIFO[ir - 1] != 0xD)) {
 				ir = 0;
 				print_error();
 				return;
 			}
-			else if (ir >= 3 && RFIFO[ir - 2] == 0xD && RFIFO[ir - 1] == 0xA) {
-				for (j = 0; j < ir - 2; j++) {
+			else if (ir >= 2 && RFIFO[ir - 1] == 0xD) {
+				for (j = 0; j < ir - 1; j++) {
 					if (RFIFO[j] < 0x30 || RFIFO[j] > 0x39) {
 						ir = 0;
 						WFIFO = 0;
@@ -61,13 +60,14 @@ void SIO_ISR( void ) __interrupt ( 4 ) {
 						return;
 					}
 					WFIFO = WFIFO * 10 + (RFIFO[j] - 0x30);
-					ir = 0;
-					ready_to_write = 1;
-					leds(0xAA);
-					TI = 1;
 				}
+				type(EOL);
+				ir = 0;
+				ready_to_write = 1;
+				leds(WFIFO);
+				TI = 1;
 			}
-			else if (ir == 2 && RFIFO[ir - 2] == 0xD && RFIFO[ir - 1] == 0xA) {
+			else if (ir == 1 && RFIFO[ir - 1] == 0xD) {
 				ir = 0;
 				print_error();
 				return;

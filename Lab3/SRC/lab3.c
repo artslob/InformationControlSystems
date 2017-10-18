@@ -3,6 +3,8 @@
 #include "led.h"
 #include "max.h"
 #include "interrupt.h"
+#include "stdio.h"
+#include "stdlib.h"
 
 
 #define SERIAL 0xFF
@@ -22,6 +24,7 @@ unsigned char transform_char(unsigned char c) {
 		return 0xF1;
 	}*/
 	else if (0x30 <= c && c <= 0x3F) {  //  ..ï  ..ï
+		leds(c);
 		return c + 0x70;
 	}
 	else if (0x40 <= c && c <= 0x4F) {  //  ..ï  ..ï
@@ -41,8 +44,26 @@ unsigned char transform_char(unsigned char c) {
 	}
 	else {
 		leds(c);
-		return 0x95;
+		return c;
 	}
+}
+
+void print_code(unsigned char c) {
+	char buf[10] = {0};
+	unsigned char high = ( (c >> 4) & 0xF );
+	unsigned char low = ( c & 0xF );
+	if (high >= 0xA)
+		high += 0x37;
+	else high += 0x30;
+	if (low >= 0xA)
+		low += 0x37;
+	else low += 0x30;
+	buf[0] = high;
+	buf[1] = low;
+	buf[2] = 0xD;
+	buf[3] = 0xA;
+	buf[4] = 0x00;
+	type(buf);
 }
 
 void main() {
@@ -59,6 +80,8 @@ void main() {
 			if (!UART_SER_read_ready())
 				continue;
 			c = UART_SER_read();
+			
+			print_code(c);
 			
 			for (i = 0; i < 3; i++)
 				UART_SER_write(transform_char(c));
