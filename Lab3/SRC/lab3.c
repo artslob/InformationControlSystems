@@ -9,15 +9,40 @@
 #define INTERRUPT 0xFE
 
 unsigned char transform_char(unsigned char c) {
-	if (0x61 <= c && c <= 0x7A)       // en to EN
+	if (0x61 <= c && c <= 0x7A) {       // en to EN
 		return c - 0x20;
-	else if (0x80 <= c && c <= 0x8F)  // Ð..ÐŸ to Ð°..Ð¿
+	}
+	/*else if (0x80 <= c && c <= 0x8F) {  // Ð..ÐŸ to Ð°..Ð¿
 		return c + 0x20;
-	else if (0x90 <= c && c <= 0x9F)  // Ð ..Ð¯ to Ñ€..Ñ
+	}
+	else if (0x90 <= c && c <= 0x9F) {  // Ð ..Ð¯ to Ñ€..Ñ
 		return c + 0x50;
-	else if (c == 0xF0)               // Ð to Ñ‘
+	}
+	else if (c == 0xF0) {               // Ð to Ñ‘
 		return 0xF1;
-	else return c;
+	}*/
+	else if (0x30 <= c && c <= 0x3F) {  //  ..ï  ..ï
+		return c + 0x70;
+	}
+	else if (0x40 <= c && c <= 0x4F) {  //  ..ï  ..ï
+		return c + 0xA0;
+	}
+	else if (c == 0x01) {
+		return 0xF1;
+	}
+	else if (c == 0x51) {
+		return 0xF1;
+	}
+	else if (0x10 <= c && c <= 0x1F) { // €..Ÿ  ..ï
+		return c + 0x90;
+	}
+	else if (0x20 <= c && c <= 0x2F) { // €..Ÿ  ..ï
+		return c + 0xC0;
+	}
+	else {
+		leds(c);
+		return 0x95;
+	}
 }
 
 void main() {

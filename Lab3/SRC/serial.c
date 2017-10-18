@@ -1,6 +1,7 @@
 #include "serial.h"
 #include "aduc812.h"
 #include "interrupt.h"
+#include "led.h"
 
 
 /*** interrupt ***/
@@ -62,6 +63,7 @@ void SIO_ISR( void ) __interrupt ( 4 ) {
 					WFIFO = WFIFO * 10 + (RFIFO[j] - 0x30);
 					ir = 0;
 					ready_to_write = 1;
+					leds(0xAA);
 					TI = 1;
 				}
 			}
