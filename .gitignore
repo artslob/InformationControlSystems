@@ -6,7 +6,8 @@
 *.lk
 pm3p_*.txt
 com?_log.txt
-*.gz*.asm
+*.gz
+*.asm
 *.rel
 *.rst
 *.sym
