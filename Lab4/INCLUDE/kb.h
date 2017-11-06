@@ -2,6 +2,7 @@
 #define __KB__H
 
 #include "serial.h"
+#include "max.h"
 
 #define MAX_KEYS_PRESSED 2
 #define QUEUE_LENGTH 10
@@ -18,6 +19,9 @@ unsigned char keyboard[4][4] = {
 	{'0', '*', '#', 'D'},
 };
 
+unsigned char is_queue_empty(){
+	return start_queue == end_queue;
+}
 
 void capture_button(unsigned char c) {
 	if (start_queue == QUEUE_LENGTH)
@@ -27,7 +31,7 @@ void capture_button(unsigned char c) {
 
 unsigned char get_button() {
 	if (start_queue == end_queue)
-		return 0x00;
+		return 0x3F;
 	if (end_queue == QUEUE_LENGTH)
 		end_queue = 0;
 	return queue[end_queue++];

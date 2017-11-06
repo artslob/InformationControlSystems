@@ -16,7 +16,7 @@ void type(char * str);
 
 
 /*** interrupt ***/
-
+/*
 void print_error(){
 	EA = 0;
 	type("Invalid arguments.");
@@ -95,7 +95,7 @@ void UART_INT_init() {
 	ES = 1;  // interrupt serial on
 	SetVector(0x2023, (void *) SIO_ISR);
 }
-
+*/
 /*** serial ***/
 
 void UART_SER_init() {
