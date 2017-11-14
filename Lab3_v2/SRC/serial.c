@@ -6,6 +6,9 @@
 
 /*** interrupt ***/
 
+unsigned char mode = 0, writing_mode = 100, ready_to_write = 0;
+unsigned char first = 0, second = 0, result = 0;
+
 void print_error(){
 	EA = 0;
 	type("Invalid arguments.");
@@ -13,69 +16,107 @@ void print_error(){
 	EA = 1;
 }
 
-unsigned char WFIFO = 0;
-unsigned char iw = 0;
-unsigned char ready_to_write = 0;
+void error(){
+	mode = first = second = 0;
+}
 
-unsigned char RFIFO[5] = {0};
-unsigned char ir = 0;
 
 void SIO_ISR( void ) __interrupt ( 4 ) {
 	unsigned char buf = 0;
-	char j = 0;
 	
 	if(TI && ready_to_write) { // Передача байта
-		if (iw < 8) {
-			if (( WFIFO >> (7 - iw)) & 0x1)
-				SBUF = 0x31;
-			else SBUF = 0x30;
-			iw++;
+		if (writing_mode == 100) {
+			SBUF = 0x30 + result / 100;
+			result = result % 100;
+			writing_mode = 10;
 		}
-		else if (iw == 8) {
-			WFIFO = 0;
-			SBUF = 0xA;
+		else if (writing_mode == 10) {
+			SBUF = 0x30 + result / 10;
+			result = result % 10;
+			writing_mode = 1;
+		}
+		else if (writing_mode == 1) {
+			SBUF = 0x30 + result;
+			writing_mode = 100;
 			ready_to_write = 0;
-			iw = 0;
 		}
 		TI = 0;
 	}
 	if(RI) { // Прием байта
 		buf = SBUF;
 		leds(buf);
-		UART_SER_write(buf);
+		//UART_SER_write(buf);
 		RI = 0;
-		if ((0x30 <= buf && buf <= 0x39) || buf == 0xD) {
-			RFIFO[ir++] = buf;
-			if (ir == 4 && (RFIFO[ir - 1] != 0xD)) {
-				ir = 0;
-				print_error();
-				return;
-			}
-			else if (ir >= 2 && RFIFO[ir - 1] == 0xD) {
-				for (j = 0; j < ir - 1; j++) {
-					if (RFIFO[j] < 0x30 || RFIFO[j] > 0x39) {
-						ir = 0;
-						WFIFO = 0;
-						print_error();
-						return;
-					}
-					WFIFO = WFIFO * 10 + (RFIFO[j] - 0x30);
+		
+		switch (mode) {
+			case 0:
+				if (0x30 <= buf && buf <= 0x39) {
+					first = buf - 0x30;
+					mode = 1;
 				}
-				type(EOL);
-				ir = 0;
-				ready_to_write = 1;
-				leds(WFIFO);
-				TI = 1;
-			}
-			else if (ir == 1 && RFIFO[ir - 1] == 0xD) {
-				ir = 0;
-				print_error();
-				return;
-			}
+				else if (buf != 0xD) {
+					error();
+					print_error();
+				}
+			break;
+			case 1:
+				if (0x30 <= buf && buf <= 0x39) {
+					first = first * 10 + (buf - 0x30);
+					mode = 2;
+				}
+				else if (buf == '+') {
+					mode = 3;
+				}
+				else {
+					error();
+					print_error();
+				}
+			break;
+			case 2:
+				if (buf == '+')
+					mode = 3;
+				else {
+					error();
+					print_error();
+				}
+			break;
+			case 3:
+				if (0x30 <= buf && buf <= 0x39) {
+					second = buf - 0x30;
+					mode = 4;
+				}
+				else {
+					error();
+					print_error();
+				}
+			break;
+			case 4:
+				if (0x30 <= buf && buf <= 0x39) {
+					second = second * 10 + (buf - 0x30);
+					mode = 5;
+				}
+				else if (buf == '=') {
+					mode = 6;
+				}
+				else {
+					error();
+					print_error();
+				}
+			break;
+			case 5:
+				if (buf == '=')
+					mode = 6;
+				else {
+					error();
+					print_error();
+				}
+			break;
 		}
-		else {
-			ir = 0;
-			print_error();
+		if (mode == 6) {
+			mode = 0;
+			result = first + second;
+			ready_to_write = 1;
+			TI = 1;
 		}
 	}
 }
