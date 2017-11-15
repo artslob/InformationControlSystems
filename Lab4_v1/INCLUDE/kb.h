@@ -3,20 +3,21 @@
 
 #include "serial.h"
 #include "max.h"
+#include "led.h"
 
 #define MAX_KEYS_PRESSED 2
 #define QUEUE_LENGTH 10
 
 unsigned char column = 3;
-char bounce[4][4] = {{0}};
-short time[4][4] = {{0}};
+unsigned char bounce[4][4] = {{0}};
+unsigned short time[4][4] = {{0}};
 unsigned char queue[QUEUE_LENGTH] = {0};
 char start_queue = 0, end_queue = 0;
 unsigned char keyboard[4][4] = {
 	{'1', '2', '3', 'A'},
 	{'4', '5', '6', 'B'},
 	{'7', '8', '9', 'C'},
-	{'0', '*', '#', 'D'},
+	{'*', '0', '#', 'D'},
 };
 
 unsigned char is_queue_empty(){
@@ -43,15 +44,15 @@ void invalid_input(){
 	type("fantom mistake\n");
 	for(i = 0; i < 4; i++) {
 		for(j = 0; j < 4; j++){
-			bounce[i][j]=0;
-			time[i][j]=0;
+			bounce[i][j] = 0;
+			time[i][j] = 0;
 		}
 	}
 	EA = 1;
 }
 
 unsigned char scan_row() {
-	unsigned char col;
+	unsigned char col, row;
 	
 	if (column == 3)
 		column = 0;
@@ -60,7 +61,10 @@ unsigned char scan_row() {
 	col = 0x1 << column; //0001,0010,0100,1000,0001,...
 	write_max(KB, ~col); //11111110,11111101,11111011,11110111,11111110,...
 	
-	return (~(read_max(KB) & 0xF0)) >> 4;
+	row = read_max(KB) & (0xF0);
+	row = (~(row >> 4)) & 0x0F;
+	return row;
+	//return (~(read_max(KB) & 0xF0)) >> 4;
 }
 
 void timer_kb(void) __interrupt( 1 ) {
@@ -68,46 +72,51 @@ void timer_kb(void) __interrupt( 1 ) {
 	unsigned char i, j;
 	
 	scanned_row = scan_row();
-	
+	key_pressed = 0;
 	for (row = 0; row < 4; row++) {
+		//leds(scanned_row);
 		if (scanned_row & (0x01 << row)) {
-			if (bounce[row][column] < 5)
+			if (bounce[row][column] < 3)
 				bounce[row][column]++;
 			else
 				time[row][column]++;
 		}
 		else {
 			if (bounce[row][column] > 0)
-				bounce[row][column]--;
+				bounce[row][column] = 0;
 			else if (time[row][column] > 0)
 				time[row][column] = 0;
 		}
 		
-		for(i = 0; i < 4; i++)
-			for(j = 0; j < 4; j++)
-				if(bounce[i][j] == 5)
+		for(i = 0; i < 4; i++) {
+			for(j = 0; j < 4; j++) {
+				if(bounce[i][j] == 3)
 					key_pressed++;
-				
+			}
+		}
+		
+		leds(key_pressed);
 		if (key_pressed > MAX_KEYS_PRESSED)
 			invalid_input();
 		else {
-			if (bounce[row][column] >= 5 && time[row][column] == 1) {
+			key_pressed = 0;
+			if (bounce[row][column] >= 3 && time[row][column] == 1) {
 				capture_button(keyboard[row][column]);
 			}
-			else if (time[row][column] == 100) {
+			else if (time[row][column] >= 15) {
 				capture_button(keyboard[row][column]);
 				time[row][column] = 2;
 			}
 		}
 	}
-	TH0 = 0xF6;    // T0 1kHz
-	TL0 = 0xDD;
+	TH0 = 0xED;    // T0 1kHz
+	TL0 = 0xBB;
 }
 
 void init_kb_timer(){
 	SetVector(0x200B, (void*) timer_kb); // T0 int prog
-	TH0 = 0xF6;    // T0 1kHz
-	TL0 = 0xDD;
+	TH0 = 0xED;    // T0 1kHz
+	TL0 = 0xBB;
 	TMOD |= 0x01;  // T0 16 bit
 	ET0 = 1;       // T0 int
 	TR0 = 1;       // T0 run
