@@ -66,8 +66,82 @@ void print_code(unsigned char c) {
 	type(buf);
 }
 
+void write_symbol(unsigned char symbol) {
+	while (is_wfifo_full());
+	wfifo_capture_symbol(symbol);
+	TI = 1;
+}
+
+void write_str(char* str) {
+	while(*str)
+		write_symbol(*str++);
+}
+
+void print_error(){
+	write_str("Invalid arguments.");
+	write_str(EOL);
+}
+
+void print_result(unsigned char result) {
+	unsigned char i = 0;
+	for (i = 0; i < 8; i++) {
+		if (( result >> (7 - i)) & 0x1)
+			   write_symbol(0x31);
+		else write_symbol(0x30);
+	}
+	write_symbol(0x0A);
+}
+
+unsigned char RESULT = 0;
+unsigned char READ_ARRAY[5] = {0};
+unsigned char c, j, ir = 0;
+
+void handle_interrupt_mode() {
+	if (is_rfifo_empty())
+		return;
+	
+	c = rfifo_get_symbol();
+	leds(c);
+	
+	write_symbol(c);
+	
+	if ((0x30 <= c && c <= 0x39) || c == 0xD) {
+		READ_ARRAY[ir++] = c;
+		if (ir == 4 && (READ_ARRAY[ir - 1] != 0xD)) {
+			ir = 0;
+			print_error();
+			return;
+		}
+		else if (ir >= 2 && READ_ARRAY[ir - 1] == 0xD) {
+			for (j = 0; j < ir - 1; j++) {
+				if (READ_ARRAY[j] < 0x30 || READ_ARRAY[j] > 0x39) {
+					ir = 0;
+					RESULT = 0;
+					print_error();
+					return;
+				}
+				RESULT = RESULT * 10 + (READ_ARRAY[j] - 0x30);
+			}
+			type(EOL);
+			ir = 0;
+			leds(RESULT);
+			print_result(RESULT);
+			RESULT = 0;
+		}
+		else if (ir == 1 && READ_ARRAY[ir - 1] == 0xD) {
+			ir = 0;
+			print_error();
+			return;
+		}
+	}
+	else {
+		ir = 0;
+		print_error();
+	}
+}
+
 void main() {
-	unsigned char dip = 0, c = 0, i = 0;
+	unsigned char dip = 0, i = 0;
 	
 	UART_SER_init();
 	UART_INT_init();
@@ -89,7 +163,10 @@ void main() {
 		} 
 		else  if (dip == INTERRUPT) {
 			EA = 1;
-		} else {
+			
+			handle_interrupt_mode();
+		} 
+		else {
 			leds(0xAA);
 		}
 	}

@@ -6,77 +6,65 @@
 
 /*** interrupt ***/
 
-void print_error(){
-	EA = 0;
-	type("Invalid arguments.");
-	type(EOL);
-	EA = 1;
+#define QUEUE_LENGTH 10
+
+/* WFIFO */
+unsigned char WFIFO[QUEUE_LENGTH] = {0};
+unsigned char Wfifo_start_queue = 0, Wfifo_end_queue = 0;
+
+unsigned char is_wfifo_full(){
+	unsigned char next_end_position = Wfifo_end_queue;
+	if (next_end_position == QUEUE_LENGTH)
+		next_end_position = 0;
+	return next_end_position == Wfifo_start_queue;
 }
 
-unsigned char WFIFO = 0;
-unsigned char iw = 0;
-unsigned char ready_to_write = 0;
+void wfifo_capture_symbol(unsigned char symbol) {
+	if (Wfifo_start_queue == QUEUE_LENGTH)
+		Wfifo_start_queue = 0;
+	WFIFO[Wfifo_start_queue++] = symbol;
+}
 
-unsigned char RFIFO[5] = {0};
-unsigned char ir = 0;
+unsigned char wfifo_get_symbol() {
+	if (Wfifo_start_queue == Wfifo_end_queue)
+		return 0x00;
+	if (Wfifo_end_queue == QUEUE_LENGTH)
+		Wfifo_end_queue = 0;
+	return WFIFO[Wfifo_end_queue++];
+}
+
+/* RFIFO */
+unsigned char RFIFO[QUEUE_LENGTH] = {0};
+char Rfifo_start_queue = 0, Rfifo_end_queue = 0;
+
+unsigned char is_rfifo_empty(){
+	return Rfifo_end_queue == Rfifo_start_queue;
+}
+
+void rfifo_capture_symbol(unsigned char symbol) {
+	if (Rfifo_start_queue == QUEUE_LENGTH)
+		Rfifo_start_queue = 0;
+	RFIFO[Rfifo_start_queue++] = symbol;
+}
+
+unsigned char rfifo_get_symbol() {
+	if (Rfifo_start_queue == Rfifo_end_queue)
+		return 0x00;
+	if (Rfifo_end_queue == QUEUE_LENGTH)
+		Rfifo_end_queue = 0;
+	return RFIFO[Rfifo_end_queue++];
+}
 
 void SIO_ISR( void ) __interrupt ( 4 ) {
 	unsigned char buf = 0;
-	char j = 0;
 	
-	if(TI && ready_to_write) { // Передача байта
-		if (iw < 8) {
-			if (( WFIFO >> (7 - iw)) & 0x1)
-				SBUF = 0x31;
-			else SBUF = 0x30;
-			iw++;
-		}
-		else if (iw == 8) {
-			WFIFO = 0;
-			SBUF = 0xA;
-			ready_to_write = 0;
-			iw = 0;
-		}
+	if(TI) { // Передача байта
+		SBUF = wfifo_get_symbol();
 		TI = 0;
 	}
 	if(RI) { // Прием байта
-		buf = SBUF;
-		leds(buf);
-		UART_SER_write(buf);
+		rfifo_capture_symbol(SBUF);
 		RI = 0;
-		if ((0x30 <= buf && buf <= 0x39) || buf == 0xD) {
-			RFIFO[ir++] = buf;
-			if (ir == 4 && (RFIFO[ir - 1] != 0xD)) {
-				ir = 0;
-				print_error();
-				return;
-			}
-			else if (ir >= 2 && RFIFO[ir - 1] == 0xD) {
-				for (j = 0; j < ir - 1; j++) {
-					if (RFIFO[j] < 0x30 || RFIFO[j] > 0x39) {
-						ir = 0;
-						WFIFO = 0;
-						print_error();
-						return;
-					}
-					WFIFO = WFIFO * 10 + (RFIFO[j] - 0x30);
-				}
-				type(EOL);
-				ir = 0;
-				ready_to_write = 1;
-				leds(WFIFO);
-				TI = 1;
-			}
-			else if (ir == 1 && RFIFO[ir - 1] == 0xD) {
-				ir = 0;
-				print_error();
-				return;
-			}
-		}
-		else {
-			ir = 0;
-			print_error();
-		}
 	}
 }
 
