@@ -56,8 +56,6 @@ unsigned char rfifo_get_symbol() {
 }
 
 void SIO_ISR( void ) __interrupt ( 4 ) {
-	unsigned char buf = 0;
-	
 	if(TI) { // Передача байта
 		SBUF = wfifo_get_symbol();
 		TI = 0;
