@@ -91,6 +91,118 @@ unsigned char transform_char(unsigned char c) {
 	}
 }
 
+void write_symbol(unsigned char symbol) {
+	while (is_wfifo_full());
+	wfifo_capture_symbol(symbol);
+	while(TI);
+	TI = 1;
+}
+
+void write_str(char* str) {
+	while(*str)
+		write_symbol(*str++);
+}
+
+void print_error(){
+	write_str("Invalid arguments.");
+	write_str(EOL);
+}
+
+unsigned char mode = 0, writing_mode = 100, ready_to_write = 0;
+unsigned char first = 0, second = 0;
+
+void error(){
+	mode = first = second = 0;
+}
+
+void print_result(unsigned char result) {
+	write_symbol(0x30 + result / 100);
+	result = result % 100;
+	write_symbol(0x30 + result / 10);
+	result = result % 10;
+	write_symbol(0x30 + result);
+}
+
+void handle_interrupt_mode() {
+	unsigned char buf = 0;
+	
+	if (is_rfifo_empty())
+		return;
+	
+	buf = rfifo_get_symbol();
+	leds(buf);
+	write_symbol(buf);
+	
+	switch (mode) {
+		case 0:
+			if (0x30 <= buf && buf <= 0x39) {
+				first = buf - 0x30;
+				mode = 1;
+			}
+			else if (buf != 0xD) {
+				error();
+				print_error();
+			}
+		break;
+		case 1:
+			if (0x30 <= buf && buf <= 0x39) {
+				first = first * 10 + (buf - 0x30);
+				mode = 2;
+			}
+			else if (buf == '+') {
+				mode = 3;
+			}
+			else {
+				error();
+				print_error();
+			}
+		break;
+		case 2:
+			if (buf == '+')
+				mode = 3;
+			else {
+				error();
+				print_error();
+			}
+		break;
+		case 3:
+			if (0x30 <= buf && buf <= 0x39) {
+				second = buf - 0x30;
+				mode = 4;
+			}
+			else {
+				error();
+				print_error();
+			}
+		break;
+		case 4:
+			if (0x30 <= buf && buf <= 0x39) {
+				second = second * 10 + (buf - 0x30);
+				mode = 5;
+			}
+			else if (buf == '=') {
+				mode = 6;
+			}
+			else {
+				error();
+				print_error();
+			}
+		break;
+		case 5:
+			if (buf == '=')
+				mode = 6;
+			else {
+				error();
+				print_error();
+			}
+		break;
+	}
+	if (mode == 6) {
+		mode = 0;
+		print_result(first + second);
+	}
+}
+
 void main() {
 	unsigned char dip = 0, c = 0, i = 0;
 	
@@ -121,6 +233,8 @@ void main() {
 		} 
 		else  if (dip == INTERRUPT) {
 			EA = 1;
+			
+			handle_interrupt_mode();
 		} else {
 			leds(0xAA);
 		}

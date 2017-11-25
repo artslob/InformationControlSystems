@@ -6,118 +6,70 @@
 
 /*** interrupt ***/
 
-unsigned char mode = 0, writing_mode = 100, ready_to_write = 0;
-unsigned char first = 0, second = 0, result = 0;
+#define QUEUE_LENGTH 10
 
-void print_error(){
-	EA = 0;
-	type("Invalid arguments.");
-	type(EOL);
-	EA = 1;
+/* WFIFO */
+unsigned char WFIFO[QUEUE_LENGTH] = {0};
+unsigned char Wfifo_start_queue = 0, Wfifo_end_queue = 0;
+
+unsigned char is_wfifo_empty() {
+	return Wfifo_end_queue == Wfifo_start_queue;
 }
 
-void error(){
-	mode = first = second = 0;
+unsigned char is_wfifo_full() {
+	unsigned char next_end_position = Wfifo_end_queue;
+	if (next_end_position == QUEUE_LENGTH)
+		next_end_position = 0;
+	return next_end_position == Wfifo_start_queue;
+}
+
+void wfifo_capture_symbol(unsigned char symbol) {
+	if (Wfifo_start_queue == QUEUE_LENGTH)
+		Wfifo_start_queue = 0;
+	WFIFO[Wfifo_start_queue++] = symbol;
+}
+
+unsigned char wfifo_get_symbol() {
+	if (Wfifo_start_queue == Wfifo_end_queue)
+		return 0x00;
+	if (Wfifo_end_queue == QUEUE_LENGTH)
+		Wfifo_end_queue = 0;
+	return WFIFO[Wfifo_end_queue++];
+}
+
+/* RFIFO */
+unsigned char RFIFO[QUEUE_LENGTH] = {0};
+char Rfifo_start_queue = 0, Rfifo_end_queue = 0;
+
+unsigned char is_rfifo_empty(){
+	return Rfifo_end_queue == Rfifo_start_queue;
+}
+
+void rfifo_capture_symbol(unsigned char symbol) {
+	if (Rfifo_start_queue == QUEUE_LENGTH)
+		Rfifo_start_queue = 0;
+	RFIFO[Rfifo_start_queue++] = symbol;
+}
+
+unsigned char rfifo_get_symbol() {
+	if (Rfifo_start_queue == Rfifo_end_queue)
+		return 0x00;
+	if (Rfifo_end_queue == QUEUE_LENGTH)
+		Rfifo_end_queue = 0;
+	return RFIFO[Rfifo_end_queue++];
 }
 
 
 void SIO_ISR( void ) __interrupt ( 4 ) {
-	unsigned char buf = 0;
-	
-	if(TI && ready_to_write) { // Передача байта
-		if (writing_mode == 100) {
-			SBUF = 0x30 + result / 100;
-			result = result % 100;
-			writing_mode = 10;
+	if(TI) { // Передача байта
+		if (!is_wfifo_empty()) {
+			SBUF = wfifo_get_symbol();
+			TI = 0;			
 		}
-		else if (writing_mode == 10) {
-			SBUF = 0x30 + result / 10;
-			result = result % 10;
-			writing_mode = 1;
-		}
-		else if (writing_mode == 1) {
-			SBUF = 0x30 + result;
-			writing_mode = 100;
-			ready_to_write = 0;
-		}
-		TI = 0;
 	}
 	if(RI) { // Прием байта
-		buf = SBUF;
-		leds(buf);
-		//UART_SER_write(buf);
+		rfifo_capture_symbol(SBUF);
 		RI = 0;
-		
-		switch (mode) {
-			case 0:
-				if (0x30 <= buf && buf <= 0x39) {
-					first = buf - 0x30;
-					mode = 1;
-				}
-				else if (buf != 0xD) {
-					error();
-					print_error();
-				}
-			break;
-			case 1:
-				if (0x30 <= buf && buf <= 0x39) {
-					first = first * 10 + (buf - 0x30);
-					mode = 2;
-				}
-				else if (buf == '+') {
-					mode = 3;
-				}
-				else {
-					error();
-					print_error();
-				}
-			break;
-			case 2:
-				if (buf == '+')
-					mode = 3;
-				else {
-					error();
-					print_error();
-				}
-			break;
-			case 3:
-				if (0x30 <= buf && buf <= 0x39) {
-					second = buf - 0x30;
-					mode = 4;
-				}
-				else {
-					error();
-					print_error();
-				}
-			break;
-			case 4:
-				if (0x30 <= buf && buf <= 0x39) {
-					second = second * 10 + (buf - 0x30);
-					mode = 5;
-				}
-				else if (buf == '=') {
-					mode = 6;
-				}
-				else {
-					error();
-					print_error();
-				}
-			break;
-			case 5:
-				if (buf == '=')
-					mode = 6;
-				else {
-					error();
-					print_error();
-				}
-			break;
-		}
-		if (mode == 6) {
-			mode = 0;
-			result = first + second;
-			ready_to_write = 1;
-			TI = 1;
-		}
 	}
 }
 
