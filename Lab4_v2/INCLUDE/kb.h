@@ -109,13 +109,13 @@ void timer_kb(void) __interrupt( 1 ) {
 			}
 		}
 	}
-	TH0 = 0xED;    // T0 1kHz
+	TH0 = 0xED;    // T0 200Hz
 	TL0 = 0xBB;
 }
 
 void init_kb_timer(){
 	SetVector(0x200B, (void*) timer_kb); // T0 int prog
-	TH0 = 0xED;    // T0 1kHz
+	TH0 = 0xED;    // T0 200Hz
 	TL0 = 0xBB;
 	TMOD |= 0x01;  // T0 16 bit
 	ET0 = 1;       // T0 int

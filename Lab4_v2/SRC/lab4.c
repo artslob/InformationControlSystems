@@ -5,33 +5,29 @@
 #define NORMAL 0xFF
 #define DEBUG 0xFE
 
-unsigned char WFIFO = 0;
-
-unsigned char RFIFO[5] = {0};
-unsigned char ir = 0;
-
-void print_error(){
-	EA = 0;
-	type(EOL);
+void print_error() {
 	type("Invalid arguments.");
 	type(EOL);
-	EA = 1;
 }
 
-void print_result() {
-	unsigned char i = 0;
-	
-	for (i = 0; i < 8; i++){
-		if (( WFIFO >> (7 - i)) & 0x1)
-			UART_SER_write('1');
-		else UART_SER_write('0');
-	}
-	WFIFO = 0;
+void print_result(unsigned char result) {
 	type(EOL);
+	UART_SER_write(0x30 + result / 100);
+	result = result % 100;
+	UART_SER_write(0x30 + result / 10);
+	result = result % 10;
+	UART_SER_write(0x30 + result);
+	type(EOL);
+}
+
+unsigned char mode = 0, first = 0, second = 0;
+
+void error(){
+	mode = first = second = 0;
 }
 
 void main() {
-	unsigned char dip = 0, button = 0, j = 0;
+	unsigned char dip = 0, buf = 0;
 	
 	UART_SER_init();
 	init_kb_timer();
@@ -44,6 +40,78 @@ void main() {
 			if (is_queue_empty())
 				continue;
 			
+			buf = get_button();
+			leds(buf);
+			UART_SER_write(buf);
+			
+			switch (mode) {
+				case 0:
+					if (0x30 <= buf && buf <= 0x39) {
+						first = buf - 0x30;
+						mode = 1;
+					}
+					else {
+						error();
+						print_error();
+					}
+				break;
+				case 1:
+					if (0x30 <= buf && buf <= 0x39) {
+						first = first * 10 + (buf - 0x30);
+						mode = 2;
+					}
+					else if (buf == 'A'/*+*/) {
+						mode = 3;
+					}
+					else {
+						error();
+						print_error();
+					}
+				break;
+				case 2:
+					if (buf == 'A'/*+*/)
+						mode = 3;
+					else {
+						error();
+						print_error();
+					}
+				break;
+				case 3:
+					if (0x30 <= buf && buf <= 0x39) {
+						second = buf - 0x30;
+						mode = 4;
+					}
+					else {
+						error();
+						print_error();
+					}
+				break;
+				case 4:
+					if (0x30 <= buf && buf <= 0x39) {
+						second = second * 10 + (buf - 0x30);
+						mode = 5;
+					}
+					else if (buf == '#'/*=*/) {
+						mode = 6;
+					}
+					else {
+						error();
+						print_error();
+					}
+				break;
+				case 5:
+					if (buf == '#'/*=*/)
+						mode = 6;
+					else {
+						error();
+						print_error();
+					}
+				break;
+			}
+			if (mode == 6) {
+				mode = 0;
+				print_result(first + second);
+			}
 			
 		}
 		else if (dip == DEBUG) {
