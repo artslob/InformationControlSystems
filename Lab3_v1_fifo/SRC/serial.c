@@ -19,6 +19,10 @@ unsigned char is_wfifo_full(){
 	return next_end_position == Wfifo_start_queue;
 }
 
+unsigned char is_wfifo_empty() {
+	return Wfifo_end_queue == Wfifo_start_queue;
+}
+
 void wfifo_capture_symbol(unsigned char symbol) {
 	if (Wfifo_start_queue == QUEUE_LENGTH)
 		Wfifo_start_queue = 0;
@@ -57,8 +61,10 @@ unsigned char rfifo_get_symbol() {
 
 void SIO_ISR( void ) __interrupt ( 4 ) {
 	if(TI) { // Передача байта
-		SBUF = wfifo_get_symbol();
-		TI = 0;
+		if (!is_wfifo_empty()) {
+			SBUF = wfifo_get_symbol();
+			TI = 0;
+		}
 	}
 	if(RI) { // Прием байта
 		rfifo_capture_symbol(SBUF);
