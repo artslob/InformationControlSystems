@@ -69,7 +69,6 @@ void print_code(unsigned char c) {
 void write_symbol(unsigned char symbol) {
 	while (is_wfifo_full());
 	wfifo_capture_symbol(symbol);
-	while(TI);
 	TI = 1;
 }
 
