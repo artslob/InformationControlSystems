@@ -60,7 +60,7 @@ void main() {
 						first = first * 10 + (buf - 0x30);
 						mode = 2;
 					}
-					else if (buf == 'A'/*+*/) {
+					else if (buf == '+') {
 						mode = 3;
 					}
 					else {
@@ -69,7 +69,7 @@ void main() {
 					}
 				break;
 				case 2:
-					if (buf == 'A'/*+*/)
+					if (buf == '+')
 						mode = 3;
 					else {
 						error();
@@ -91,7 +91,7 @@ void main() {
 						second = second * 10 + (buf - 0x30);
 						mode = 5;
 					}
-					else if (buf == '#'/*=*/) {
+					else if (buf == '=') {
 						mode = 6;
 					}
 					else {
@@ -100,7 +100,7 @@ void main() {
 					}
 				break;
 				case 5:
-					if (buf == '#'/*=*/)
+					if (buf == '=')
 						mode = 6;
 					else {
 						error();
